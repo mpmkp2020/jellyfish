@@ -30,3 +30,43 @@ jobs:
       run: |
         pip install pytest
         pytest jellyfish/test.py
+
+  build-aarch64:
+
+    runs-on: ${{ matrix.os }}
+    strategy:
+      max-parallel: 4
+      matrix:
+        #python-version: [cp36-cp36m, cp37-cp37m, cp38-cp38, cp39-cp39]
+        python-version: [36, 37, 38, 39]
+        os: [ubuntu-latest]
+    env:
+      py: /opt/python/*${{ matrix.python-version }}*/bin/python
+      img: quay.io/pypa/manylinux2014_aarch64
+    steps:
+    - uses: actions/checkout@v1
+    - name: Checkout submodules
+      run: |
+        git submodule init
+        git submodule update
+    - name: Set up QEMU
+      id: qemu
+      uses: docker/setup-qemu-action@v1
+    - name: Install dependencies
+      run: |
+        docker run --rm -v ${{ github.workspace }}:/ws:rw --workdir=/ws \
+          ${{ env.img }} \
+          bash -exc '${{ env.py }} -m pip install virtualenv && ${{ env.py }} -m venv .env && \
+            source .env/bin/activate && \
+            python -m pip install --upgrade pip && \
+            pip install -e . && \
+            deactivate'
+    - name: Test with pytest
+      run: |
+        docker run --rm -v ${{ github.workspace }}:/ws:rw --workdir=/ws \
+          ${{ env.img }} \
+          bash -exc '\
+            source .env/bin/activate && \
+            pip install pytest && \
+            pytest jellyfish/test.py && \
+            deactivate'
